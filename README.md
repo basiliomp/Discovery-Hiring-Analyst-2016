@@ -13,60 +13,72 @@ and other metrics outside the scope of this task. EL uses JavaScript to asynchro
 
 ## Task
 
-You must create a **reproducible report**\* answering the following questions:
+You must create a **reproducible report**\* answering the following questions:  
 ```{r}
 # Initial set-up #
 #setwd("Data Analyst task")
   # Loading packages
   require(tidyr)
   # Loading data
-  events <- read.csv2("events_log.csv.gz", header = T, sep = ",", stringsAsFactors = F)
+  events <- read.csv("events_log.csv.gz", header = T, stringsAsFactors = F)
   # Checking data loaded
   str(events) # Show dimensions of the data frame and its variables.
   summary(events) # Get a hint of the data stored by each variable.
   head(events) # Print out a handful of observations to inspect them.
 ```
 
-1. What is our daily overall clickthrough rate?
-```{r}
-# 
+**1. What is our daily overall clickthrough rate?**
 
+Transforming timestamp variable into a date-time formatted variable, stored as 'time'.
+```{r}
+events$time <- strptime(x = events$timestamp, format = "%Y%m%d%H%M%S")
+```
+Four cases were not properly transformed because the timestamp did not meet the formatting requirements. Here those 4 rogue cases are shown:
+```{r}
+events[which(is.na(events$time)),]
+
+time_missing <- round(sum(is.na(events$time))/nrow(events) * 100, 6)
+```
+
+However, given that it is a minor issue affecting `r time_missing` % of cases, we will continue the analysis.
+```{r}
 CTR <- events %>%
+            group_by()
             
 ```
 
-  How does it vary between the groups?
-```{r}
+  **How does it vary between the groups?**
+```{r, cache=TRUE}
 
 ```
 
-2. Which results do people tend to try first? 
-```{r}
+**2. Which results do people tend to try first?** 
+```{r, cache=TRUE}
 
 ```
 
-  How does it change day-to-day?
-```{r}
+  **How does it change day-to-day?**
+```{r, cache=TRUE}
 
 ```
 
-3. What is our daily overall zero results rate? 
-```{r}
+**3. What is our daily overall zero results rate?** 
+```{r, cache=TRUE}
 
 ```
 
-  How does it vary between the groups?
-```{r}
+  **How does it vary between the groups?**
+```{r, cache=TRUE}
 
 ```
 
-4. Let *session length* be approximately the time between the first event and the last event in a session. Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.
-```{r}
+**4. Let *session length* be approximately the time between the first event and the last event in a session. Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.**
+```{r, cache=TRUE}
 
 ```
 
-5. Summarize your findings in an *executive summary*.
-```{r}
+**5. Summarize your findings in an *executive summary*.**
+```{r, cache=TRUE}
 
 ```
 
