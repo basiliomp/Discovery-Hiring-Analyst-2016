@@ -14,12 +14,61 @@ and other metrics outside the scope of this task. EL uses JavaScript to asynchro
 ## Task
 
 You must create a **reproducible report**\* answering the following questions:
+```{r}
+# Initial set-up #
+#setwd("Data Analyst task")
+  # Loading packages
+  require(tidyr)
+  # Loading data
+  events <- read.csv2("events_log.csv.gz", header = T, sep = ",", stringsAsFactors = F)
+  # Checking data loaded
+  str(events) # Show dimensions of the data frame and its variables.
+  summary(events) # Get a hint of the data stored by each variable.
+  head(events) # Print out a handful of observations to inspect them.
+```
 
-1. What is our daily overall clickthrough rate? How does it vary between the groups?
-2. Which results do people tend to try first? How does it change day-to-day?
-3. What is our daily overall zero results rate? How does it vary between the groups?
+1. What is our daily overall clickthrough rate?
+```{r}
+# 
+
+CTR <- events %>%
+            
+```
+
+  How does it vary between the groups?
+```{r}
+
+```
+
+2. Which results do people tend to try first? 
+```{r}
+
+```
+
+  How does it change day-to-day?
+```{r}
+
+```
+
+3. What is our daily overall zero results rate? 
+```{r}
+
+```
+
+  How does it vary between the groups?
+```{r}
+
+```
+
 4. Let *session length* be approximately the time between the first event and the last event in a session. Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.
+```{r}
+
+```
+
 5. Summarize your findings in an *executive summary*.
+```{r}
+
+```
 
 \* Given dependencies and other instructions, we should be able to re-run your source code with the dataset in the same directory and obtain the same results and figures. Popular formats for this include RMarkdown and Jupyter Notebook (formerly IPython).
 
