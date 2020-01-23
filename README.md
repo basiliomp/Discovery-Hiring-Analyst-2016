@@ -18,11 +18,12 @@ You must create a **reproducible report**\* answering the following questions:
 # Initial set-up #
 #setwd("Data Analyst task")
   # Loading packages
-  require(tidyr)
+  require(tidyverse)
+  require(lubridate)
   # Loading data
   events <- read.csv("events_log.csv.gz", header = T, stringsAsFactors = F)
   # Checking data loaded
-  str(events) # Show dimensions of the data frame and its variables.
+  str(events) # Show dimensions of the data frame and its variables. The output shows data types of each variable are consistent with the table provided (see Data section).
   summary(events) # Get a hint of the data stored by each variable.
   head(events) # Print out a handful of observations to inspect them.
 ```
@@ -31,7 +32,10 @@ You must create a **reproducible report**\* answering the following questions:
 
 Transforming timestamp variable into a date-time formatted variable, stored as 'time'.
 ```{r}
-events$time <- strptime(x = events$timestamp, format = "%Y%m%d%H%M%S")
+events$time <- as.POSIXct(strptime(x = events$timestamp, format = "%Y%m%d%H%M%S"))
+
+events$date <- lubridate::date(events$time)
+
 ```
 Four cases were not properly transformed because the timestamp did not meet the formatting requirements. Here those 4 rogue cases are shown:
 ```{r}
@@ -40,19 +44,36 @@ events[which(is.na(events$time)),]
 time_missing <- round(sum(is.na(events$time))/nrow(events) * 100, 6)
 ```
 
-However, given that it is a minor issue affecting `r time_missing` % of cases, we will continue the analysis.
+However, given that it is a minor issue affecting `r print(time_missing)` % of cases, we will continue the analysis.
+
+XXX
 ```{r}
 CTR <- events %>%
-            group_by()
-            
+            group_by(date) %>%
+            summarise("ClickthroughRate" = length(unique(session_id)) / 
+                        nrow(filter(events, action == "visitPage")))
+# Graphical representation
+ggplot(CTR, aes(x = date, y = ClickthroughRate)) + 
+  geom_col() +
+  labs(title = "Daily clickthrough rate")
 ```
 
   **How does it vary between the groups?**
+XXX
 ```{r, cache=TRUE}
+CTRab <- events %>%
+            group_by(group, date) %>%
+            summarise("ClickthroughRate" = length(unique(session_id)) / 
+                        nrow(filter(events, action == "visitPage")))
 
+# Graphical representation
+ggplot(CTRab, aes(x = date, y = ClickthroughRate, fill = group)) + 
+  geom_bar(position="dodge", stat="identity") +
+  labs(title = "Daily clickthrough rate by groups")
 ```
 
 **2. Which results do people tend to try first?** 
+That is, what is the most common result_position for the oldest visitPage action of each session_id.
 ```{r, cache=TRUE}
 
 ```
@@ -63,6 +84,7 @@ CTR <- events %>%
 ```
 
 **3. What is our daily overall zero results rate?** 
+Proportion of action == "searchResultPage" for which n_results == 0, calculated for each day.
 ```{r, cache=TRUE}
 
 ```

@@ -383,7 +383,8 @@ summary {
 <pre class="{r}"><code># Initial set-up #
 #setwd(&quot;Data Analyst task&quot;)
   # Loading packages
-  require(tidyr)
+  require(tidyverse)
+  require(lubridate)
   # Loading data
   events &lt;- read.csv(&quot;events_log.csv.gz&quot;, header = T, stringsAsFactors = F)
   # Checking data loaded
@@ -392,19 +393,23 @@ summary {
   head(events) # Print out a handful of observations to inspect them.</code></pre>
 <p><strong>1. What is our daily overall clickthrough rate?</strong></p>
 <p>Transforming timestamp variable into a date-time formatted variable, stored as ‘time’.</p>
-<pre class="{r}"><code>events$time &lt;- strptime(x = events$timestamp, format = &quot;%Y%m%d%H%M%S&quot;)</code></pre>
+<pre class="{r}"><code>events$time &lt;- as.POSIXct(strptime(x = events$timestamp, format = &quot;%Y%m%d%H%M%S&quot;))
+
+events$date &lt;- lubridate::date(events$time)
+</code></pre>
 <p>Four cases were not properly transformed because the timestamp did not meet the formatting requirements. Here those 4 rogue cases are shown:</p>
 <pre class="{r}"><code>events[which(is.na(events$time)),]
 
 time_missing &lt;- round(sum(is.na(events$time))/nrow(events) * 100, 6)</code></pre>
-<p>However, given that it is a minor issue affecting <code>r time_missing</code> % of cases, we will continue the analysis.</p>
+<p>However, given that it is a minor issue affecting <code>r print(time_missing)</code> % of cases, we will continue the analysis.</p>
 <pre class="{r}"><code>CTR &lt;- events %&gt;%
-            group_by()
+            filter(action ==&quot;visitPage&quot;) %&gt;%
+            group_by(date) %&gt;%
+            summarise(sum(unique(uuid)))
             </code></pre>
 <p><strong>How does it vary between the groups?</strong> ```{r, cache=TRUE}</p>
 <p>```</p>
-<p><strong>2. Which results do people tend to try first?</strong> ```{r, cache=TRUE}</p>
-<p>```</p>
+<p><strong>2. Which results do people tend to try first?</strong> <code>{r, cache=TRUE} events %&gt;%</code></p>
 <p><strong>How does it change day-to-day?</strong> ```{r, cache=TRUE}</p>
 <p>```</p>
 <p><strong>3. What is our daily overall zero results rate?</strong> ```{r, cache=TRUE}</p>
