@@ -13,13 +13,13 @@ and other metrics outside the scope of this task. EL uses JavaScript to asynchro
 
 ## Task
 
-You must create a **reproducible report**\* answering the following questions:  
+You must create a **reproducible report**\* answering the following questions:
 ```{r}
 # Initial set-up #
 #setwd("Data Analyst task")
   # Loading packages
-  require(tidyverse)
-  require(lubridate)
+  library(tidyverse)
+  library(lubridate)
   # Loading data
   events <- read.csv("events_log.csv.gz", header = T, stringsAsFactors = F)
   # Checking data loaded
@@ -36,25 +36,25 @@ events$time <- as.POSIXct(strptime(x = events$timestamp, format = "%Y%m%d%H%M%S"
 
 events$date <- lubridate::date(events$time)
 
+events <- arrange(events, session_id, time)
 ```
 Four cases were not properly transformed because the timestamp did not meet the formatting requirements. Here those 4 rogue cases are shown:
 ```{r}
-events[which(is.na(events$time)),]
+filter(events,is.na(events$time))
 
 time_missing <- round(sum(is.na(events$time))/nrow(events) * 100, 6)
 ```
 
 However, given that it is a minor issue affecting `r print(time_missing)` % of cases, we will continue the analysis.
 
-XXX
 ```{r}
 CTR <- events %>%
             group_by(date) %>%
-            summarise("ClickthroughRate" = length(unique(session_id)) / 
-                        nrow(filter(events, action == "visitPage")))
+            summarise("click_through_rate" = n()/
+                        n_distinct(session_id))
 # Graphical representation
-ggplot(CTR, aes(x = date, y = ClickthroughRate)) + 
-  geom_col() +
+ggplot(CTR, aes(x = date, y = click_through_rate)) + 
+  geom_step() +
   labs(title = "Daily clickthrough rate")
 ```
 
@@ -63,34 +63,85 @@ XXX
 ```{r, cache=TRUE}
 CTRab <- events %>%
             group_by(group, date) %>%
-            summarise("ClickthroughRate" = length(unique(session_id)) / 
-                        nrow(filter(events, action == "visitPage")))
+            filter(action == "visitPage") %>% 
+            summarise("click_through_rate" = n()/
+                        n_distinct(session_id))
 
 # Graphical representation
-ggplot(CTRab, aes(x = date, y = ClickthroughRate, fill = group)) + 
-  geom_bar(position="dodge", stat="identity") +
+CTRab %>% 
+  ggplot(aes(x = date, y = click_through_rate, colour = group)) + 
+  geom_step() +
   labs(title = "Daily clickthrough rate by groups")
 ```
 
 **2. Which results do people tend to try first?** 
 That is, what is the most common result_position for the oldest visitPage action of each session_id.
 ```{r, cache=TRUE}
+first_try <- events %>%
+  filter(action == "visitPage") %>%
+  group_by(session_id) %>%
+  mutate(first_result = min(time, na.rm=T)) %>%
+  filter(time == first_result) %>% 
+  select(result_position) %>% 
+  group_by(result_position) %>% 
+  transmute(cume_dist())
 
+
+first_try %>% 
+  ggplot() +
+  geom_freqpoly(aes(x = result_position)) +
+  xlim(c(0,30)) + # Upper limit set after seeing the unfiltered result.
+  labs(title = "Distribution of users' results choice")
 ```
 
   **How does it change day-to-day?**
 ```{r, cache=TRUE}
+daily_first_try <- events %>%
+  filter(action == "visitPage") %>%
+  group_by(date, session_id) %>%
+  mutate(first_result = min(time, na.rm=T)) %>%
+  filter(time == first_result) %>% 
+  select(result_position)
 
+daily_first_try %>% 
+  ggplot() +
+  geom_bar(aes(x = result_position)) +
+  xlim(c(0,20)) + # Upper limit set after seeing the unfiltered result.
+  labs(title = "Distribution of results chosen by day") +
+  facet_grid(date ~ .)
 ```
 
 **3. What is our daily overall zero results rate?** 
 Proportion of action == "searchResultPage" for which n_results == 0, calculated for each day.
 ```{r, cache=TRUE}
+ZRR <- events %>% 
+    group_by(date) %>%
+    filter(action == "searchResultPage") %>% 
+    select(date, n_results, action) %>% 
+    mutate(daily_zero_results = sum(n_results == 0))
 
+ZRR %>% 
+  group_by(date) %>%
+  summarise(daily_zero_results_rate = mean(daily_zero_results) / n()) %>% 
+  ggplot(aes(x = date, y = daily_zero_results_rate)) +
+  geom_line() +
+  labs(title = "Daily overall zero results rate")
 ```
 
   **How does it vary between the groups?**
 ```{r, cache=TRUE}
+ZRRab <- events %>% 
+    group_by(date,group) %>%
+    filter(action == "searchResultPage") %>% 
+    select(date, n_results, action) %>% 
+    mutate(daily_zero_results = sum(n_results == 0))
+
+ZRRab %>% 
+  group_by(date,group) %>%
+  summarise(daily_zero_results_rate = mean(daily_zero_results) / n()) %>% 
+  ggplot(aes(x = date, y = daily_zero_results_rate, colour = group)) +
+  geom_line() +
+  labs(title = "Daily overall zero results rate by groups")
 
 ```
 
@@ -142,3 +193,4 @@ The following are possible values for an event's action field:
 |2988d11968b25b29add3a851bec2fe02 | 20160305195342|001e61b5477f5efc |b     |checkin          |      40|5a6a1f75124cbf03 |        NA|               1|
 
 This user's search query returned 7 results, they clicked on the first result, and stayed on the page between 40 and 50 seconds. (The next check-in would have happened at 50s.)
+
