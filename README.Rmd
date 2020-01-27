@@ -1,0 +1,266 @@
+# Data Analysis Task
+
+Task description and data for candidates applying to be a Data Analyst in the [Discovery department](https://www.mediawiki.org/wiki/Wikimedia_Discovery) at [Wikimedia Foundation](https://wikimediafoundation.org/wiki/Home).
+
+## Background
+
+Discovery (and other teams within the Foundation) rely on *event logging* (EL) to track a variety of performance and usage metrics to help us make decisions. Specifically, Discovery is interested in:
+
+- *clickthrough rate*: the proportion of search sessions where the user clicked on one of the results displayed
+- *zero results rate*: the proportion of searches that yielded 0 results
+
+and other metrics outside the scope of this task. EL uses JavaScript to asynchronously send messages (events) to our servers when the user has performed specific actions. In this task, you will analyze a subset of our event logs.
+
+\* Given dependencies and other instructions, we should be able to re-run your source code with the dataset in the same directory and obtain the same results and figures. Popular formats for this include RMarkdown and Jupyter Notebook (formerly IPython).
+
+**Note**: if you submit your report as a Jupyter/IPython notebook on Greenhouse, please upload a copy to GitHub and include the link when you submit it on Greenhouse.
+
+## Data
+
+The dataset comes from a [tracking schema](https://meta.wikimedia.org/wiki/Schema:TestSearchSatisfaction2) that we use for assessing user satisfaction. Desktop users are randomly sampled to be anonymously tracked by this schema which uses a "I'm alive" pinging system that we can use to estimate how long our users stay on the pages they visit. The dataset contains just a little more than a week of EL data.
+
+| Column          | Value   | Description                                                                       |
+|:----------------|:--------|:----------------------------------------------------------------------------------|
+| uuid            | string  | Universally unique identifier (UUID) for backend event handling.                  |
+| timestamp       | integer | The date and time (UTC) of the event, formatted as YYYYMMDDhhmmss.                |
+| session_id      | string  | A unique ID identifying individual sessions.                                      |
+| group           | string  | A label ("a" or "b").                                     |
+| action          | string  | Identifies in which the event was created. See below.                             |
+| checkin         | integer | How many seconds the page has been open for.                                      |
+| page_id         | string  | A unique identifier for correlating page visits and check-ins.                    |
+| n_results       | integer | Number of hits returned to the user. Only shown for searchResultPage events.      |
+| result_position | integer | The position of the visited page's link on the search engine results page (SERP). |
+
+The following are possible values for an event's action field:
+
+- **searchResultPage**: when a new search is performed and the user is shown a SERP.
+- **visitPage**: when the user clicks a link in the results.
+- **checkin**: when the user has remained on the page for a pre-specified amount of time.
+
+### Example Session
+
+|uuid                             |      timestamp|session_id       |group |action           | checkin|page_id          | n_results| result_position|
+|:--------------------------------|:--------------|:----------------|:-----|:----------------|-------:|:----------------|---------:|---------------:|
+|4f699f344515554a9371fe4ecb5b9ebc | 20160305195246|001e61b5477f5efc |b     |searchResultPage |      NA|1b341d0ab80eb77e |         7|              NA|
+|759d1dc9966353c2a36846a61125f286 | 20160305195302|001e61b5477f5efc |b     |visitPage        |      NA|5a6a1f75124cbf03 |        NA|               1|
+|77efd5a00a5053c4a713fbe5a48dbac4 | 20160305195312|001e61b5477f5efc |b     |checkin          |      10|5a6a1f75124cbf03 |        NA|               1|
+|42420284ad895ec4bcb1f000b949dd5e | 20160305195322|001e61b5477f5efc |b     |checkin          |      20|5a6a1f75124cbf03 |        NA|               1|
+|8ffd82c27a355a56882b5860993bd308 | 20160305195332|001e61b5477f5efc |b     |checkin          |      30|5a6a1f75124cbf03 |        NA|               1|
+|2988d11968b25b29add3a851bec2fe02 | 20160305195342|001e61b5477f5efc |b     |checkin          |      40|5a6a1f75124cbf03 |        NA|               1|
+
+This user's search query returned 7 results, they clicked on the first result, and stayed on the page between 40 and 50 seconds. (The next check-in would have happened at 50s.)
+
+
+## Task
+
+You must create a **reproducible report** answering the following questions:
+```{r, results='hide', warning=FALSE}
+# Initial set-up #
+#setwd("./Discovery-Hiring-Analyst-2016/")
+# Creating a separate folder for output files.
+if(dir.exists("./output/") == FALSE){
+  dir.create("./output/")
+}
+  # Loading packages
+  library(tidyverse)
+  library(lubridate)
+```
+
+```{r, warning=FALSE}
+# Loading data
+  events <- read.csv("events_log.csv.gz", header = T, stringsAsFactors = F)
+  # Checking data loaded
+  str(events) # Show dimensions of the data frame and its variables. The output shows data types of each variable are consistent with the table provided (see Data section).
+  summary(events) # Get a hint of the data stored by each variable.
+  head(events) # Print out a handful of observations to inspect them.
+```
+
+**1. What is our daily overall clickthrough rate?**
+
+Transforming timestamp variable into a date-time formatted variable, stored as 'time'.
+```{r, cache=TRUE, warning=FALSE}
+events$time <- as.POSIXct(strptime(x = events$timestamp, format = "%Y%m%d%H%M%S"))
+
+events$date <- lubridate::date(events$time)
+
+events <- arrange(events, session_id, time)
+```
+Four cases were not properly transformed because the timestamp did not meet the formatting requirements. Here those 4 rogue cases are shown:
+```{r, cache=TRUE, warning=FALSE}
+filter(events,is.na(events$time))
+
+time_missing <- round(sum(is.na(events$time))/nrow(events) * 100, 6)
+```
+
+However, given that it is a minor issue affecting `r time_missing` % of cases, we will continue the analysis.
+
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+CTR <- events %>%
+            group_by(date) %>%
+            summarise("click_through_rate" = n()/
+                        n_distinct(session_id))
+# Graphical representation
+ggplot(CTR, aes(x = date, y = click_through_rate)) + 
+  geom_step() +
+  labs(title = "Daily clickthrough rate")
+
+ggsave("./output/1-ctr-daily.png", plot = last_plot(),
+         dpi = 320)
+```
+
+  **How does it vary between the groups?**  
+  
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+CTRab <- events %>%
+            group_by(group, date) %>%
+            filter(action == "visitPage") %>% 
+            summarise("click_through_rate" = n()/
+                        n_distinct(session_id))
+
+# Graphical representation
+CTRab %>% 
+  ggplot(aes(x = date, y = click_through_rate, colour = group)) + 
+  geom_step() +
+  labs(title = "Daily clickthrough rate by groups")
+
+ggsave("./output/1-ctr-daily-groups.png", plot = last_plot(),
+         dpi = 320)
+```
+
+**2. Which results do people tend to try first?** 
+That is, what is the most common result_position for the oldest visitPage action of each session_id.
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+first_try <- events %>%
+  filter(action == "visitPage") %>%
+  group_by(session_id) %>%
+  mutate(first_result = min(time, na.rm=T)) %>%
+  filter(time == first_result) %>% 
+  select(result_position)
+
+# Graphical representation
+first_try %>% 
+  ggplot() +
+  geom_freqpoly(aes(x = result_position)) +
+  xlim(c(NA,30)) + # Upper limit set after seeing the unfiltered result.
+  ylim(c(1,NA)) +
+  labs(title = "Distribution of users' results choice")
+
+ggsave("./output/2-first_result.png", plot = last_plot(),
+         dpi = 320)
+```
+
+  **How does it change day-to-day?**
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+daily_first_try <- events %>%
+  filter(action == "visitPage") %>%
+  group_by(date, session_id) %>%
+  mutate(first_result = min(time, na.rm=T)) %>%
+  filter(time == first_result) %>% 
+  select(result_position)
+
+# Graphical representation
+daily_first_try %>% 
+  ggplot() +
+  geom_freqpoly(aes(x = result_position)) +
+  xlim(c(NA,30)) + # Upper limit set after seeing the unfiltered result.
+  ylim(c(1,NA)) +
+  labs(title = "Distribution of results chosen by day") +
+  facet_grid(date ~ .) +
+  theme(text = element_text(size=8))
+
+ggsave("./output/2-first_result-daily.png", plot = last_plot(),
+         dpi = 320)
+```
+
+**3. What is our daily overall zero results rate?** 
+Proportion of action == "searchResultPage" for which n_results == 0, calculated for each day.
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+ZRR <- events %>% 
+    group_by(date) %>%
+    filter(action == "searchResultPage") %>% 
+    select(date, n_results, action) %>% 
+    mutate(daily_zero_results = sum(n_results == 0))
+
+# Graphical representation
+ZRR %>% 
+  group_by(date) %>%
+  summarise(daily_zero_results_rate = mean(daily_zero_results) / n()) %>% 
+  ggplot(aes(x = date, y = daily_zero_results_rate)) +
+  geom_line() +
+  labs(title = "Daily overall zero results rate")
+
+ggsave("./output/3-zrr-daily.png", plot = last_plot(),
+         dpi = 320)
+```
+
+  **How does it vary between the groups?**
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+ZRRab <- events %>% 
+    group_by(date,group) %>%
+    filter(action == "searchResultPage") %>% 
+    select(date, n_results, action) %>% 
+    mutate(daily_zero_results = sum(n_results == 0))
+
+# Graphical representation
+ZRRab %>% 
+  group_by(date,group) %>%
+  summarise(daily_zero_results_rate = mean(daily_zero_results) / n()) %>% 
+  ggplot(aes(x = date, y = daily_zero_results_rate, colour = group)) +
+  geom_line() +
+  labs(title = "Daily overall zero results rate by groups")
+
+ggsave("./output/3-zrr-daily-groups.png", plot = last_plot(),
+         dpi = 320)
+
+```
+
+**4. Let *session length* be approximately the time between the first event and the last event in a session. Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.**
+```{r, cache=TRUE, warning=FALSE}
+# Data transformation
+# Creation of session length variable (in seconds)
+events <- events %>%
+  group_by(session_id) %>% 
+  mutate(session_len = time_length(max(time, na.rm=T) - min(time, na.rm=T)))
+```
+
+```{r, cache=TRUE, warning=FALSE}
+summary(events$session_len)
+valid_session_len <- (1 - nrow(filter(events, session_len > 5000)) / nrow(events)) * 100
+```
+The new variable `session_len` is heavily skeawed to the left, with a distribution similar to a log normal one. In the following graph we will exclude extreme cases (i.e. those with a session lenght greater than 5,000 seconds--approximately 1.4 hours). The long-tail distribution implies that we will be still working with `r round(valid_session_len, 3)`% of cases.
+
+```{r, cache=TRUE, warning=FALSE}
+# Graphical representation
+events %>% 
+  group_by(session_id) %>% 
+  summarise(session_len = max(session_len)) %>% 
+  filter(session_len > 0 & session_len < 5000) %>% 
+  ggplot(aes(x = session_len)) +
+  geom_density() +
+  labs(title = "Distribution of session length")
+
+
+events %>% 
+  group_by(session_len) %>% 
+  summarise(n_session_len = n()) %>% 
+  arrange(desc(n_session_len))
+
+
+```
+
+**5. Summarize your findings in an *executive summary*.**  
+
+***
+- CTR
+- CTR groups
+- ZRR
+- ZRR daily
+- Session length  
+
+***  
